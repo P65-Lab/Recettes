@@ -1,0 +1,10 @@
+MON LIVRE DE RECETTES — PREMIERE VERSION
+
+Ouvrir index.html dans un navigateur sur ordinateur pour tester.
+Pour une installation sur iPhone/iPad, il faudra publier ces fichiers sur un site HTTPS, puis utiliser Safari > Partager > Sur l'écran d'accueil.
+
+La version actuelle sauvegarde uniquement dans le navigateur local. Utiliser « Exporter » pour sauvegarder un fichier JSON et « Importer » pour récupérer les recettes sur un autre appareil. L'importation fusionne les recettes par identifiant.
+
+Le mode « Lecture » est un aperçu visuel et NON un système de sécurité : les proches ne doivent pas recevoir un accès d'édition ou les fichiers de données privées. Pour un vrai partage familial sécurisé et une synchronisation automatique, il faudra un hébergement et une authentification avec permissions côté serveur.
+
+La première recette Poulet basquaise reprend les informations du PDF transmis. La photo d'origine n'est pas intégrée : ajouter une photo depuis le formulaire « Modifier ».
