@@ -408,8 +408,14 @@ let expandedMeal=null;
 let expandedDay=0;
 function mealChoices(dayIndex,slot){
  const current=plan[dayIndex][slot];
- const choices=readRecipes().filter(r=>r&&r.id&&r.nom).sort((a,b)=>rName(a).localeCompare(rName(b),'fr'));
- if(!choices.length)return '<p class="hint">Ajoute des recettes dans ton livre pour pouvoir choisir ce repas.</p>';
+ const choices=readRecipes().filter(r=>{
+  if(!r||!r.id||!r.nom)return false;
+  const cat=norm(r.cat),name=norm(r.nom);
+  const breakfast=/petit[ -]?dejeuner|breakfast|brunch/.test(cat)||/petit[ -]?dejeuner|porridge|muesli|granola|pancake|tartine|pain perdu|bowl cake|overnight oats|smoothie|skyr|fromage blanc/.test(name);
+  if(slot===0)return breakfast;
+  return !breakfast&&!/dessert|entree/.test(cat);
+ }).sort((a,b)=>rName(a).localeCompare(rName(b),'fr'));
+ if(!choices.length)return '<p class="hint">Aucune recette correspondante pour ce repas. Ajoute une recette dans la catégorie adaptée.</p>';
  return '<div class="breakfast-choices" role="group" aria-label="Choisir '+safe(MEALS[slot])+' du '+safe(DAYS[dayIndex])+'">'+choices.map(r=>'<label class="breakfast-option '+(current?.id===r.id?'selected':'')+'"><input type="checkbox" data-meal-day="'+dayIndex+'" data-meal-slot="'+slot+'" data-meal-id="'+safe(r.id)+'" '+(current?.id===r.id?'checked':'')+'><span>'+safe(r.nom)+'</span></label>').join('')+'</div>';
 }
 function rName(r){return String(r.nom||'')}
