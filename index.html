@@ -94,6 +94,17 @@ header{background:#fffdf8}.bar{padding:17px 20px;gap:12px}.brand{display:flex;al
 #menus .meal-select-toggle strong{display:block;margin:0}
 #menus .meal-select-toggle span{font-size:22px}
 #menus .meal-select-toggle:focus-visible{outline:2px solid var(--sage);outline-offset:2px;border-radius:6px}
+
+/* Présentation compacte des menus : ajustements demandés uniquement. */
+#menus .menu-tools{display:flex;flex-wrap:nowrap;gap:8px;align-items:stretch}
+#menus .menu-tools .btn{flex:1 1 0;min-width:0;padding:10px 8px;font-size:clamp(11px,3.2vw,14px);white-space:nowrap}
+#menus .menu-day{padding:12px;margin:9px 0}
+#menus .menu-day h2{margin:0 0 5px}
+#menus .menu-meal{padding:5px 0 7px}
+#menus .meal-select-toggle{padding:5px 2px}
+#menus .meal-selected-name{border:1px solid #d6e2d0;border-radius:9px;background:#f7faf5;padding:8px 10px;margin:2px 0 5px;line-height:1.35}
+#menus .menu-meal-actions{margin:0}
+#menus .menu-meal-actions .btn{padding:6px 10px;font-size:12px}
 </style><style>/* Choix explicite d’une recette lors du remplacement d’un repas */
 .menu-choice-overlay{position:fixed;inset:0;z-index:1005;background:#0009;display:flex;align-items:center;justify-content:center;padding:16px}
 .menu-choice-box{width:min(520px,100%);max-height:85dvh;overflow:auto;background:#fffdf8;border-radius:18px;padding:20px;box-shadow:0 12px 35px #0004}
