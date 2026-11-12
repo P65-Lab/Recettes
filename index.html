@@ -395,9 +395,10 @@ function shoppingLines(){
   if(unit==='cs'||unit==='cc')n=Math.round((n+Number.EPSILON)*2)/2;
   else if(!['g','ml','kg','cl','l'].includes(unit))n=Math.ceil(n-0.5-1e-9); // 4,5 reste 4 ; 4,6 devient 5
   else n=Math.round(n*100)/100;
+  if(qty>0&&n===0)n=unit==='g'||unit==='ml'?Math.round(qty*100)/100:1;
   return String(n).replace('.',',');
  }
- return [...grouped.entries()].map(([key,item])=>({key,universe:shopUniverse(item.name),dishes:[...item.dishes],label:item.qty===null?item.name:(displayQty(item.qty,item.unit)+' '+(item.unit?item.unit+' ':'')+item.name)})).sort((a,b)=>SHOP_UNIVERSES.indexOf(a.universe)-SHOP_UNIVERSES.indexOf(b.universe)||a.label.localeCompare(b.label,'fr',{sensitivity:'base'}));
+ return [...grouped.entries()].filter(([,item])=>item.qty===null||item.qty>0).map(([key,item])=>({key,universe:shopUniverse(item.name),dishes:[...item.dishes],label:item.qty===null?item.name:(displayQty(item.qty,item.unit)+' '+(item.unit?item.unit+' ':'')+item.name)})).sort((a,b)=>SHOP_UNIVERSES.indexOf(a.universe)-SHOP_UNIVERSES.indexOf(b.universe)||a.label.localeCompare(b.label,'fr',{sensitivity:'base'}));
 }
 /* Sélection repliable d'une recette pour chaque repas de chaque journée. */
 let expandedMeal=null;
