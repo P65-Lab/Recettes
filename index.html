@@ -83,7 +83,7 @@ header{background:#fffdf8}.bar{padding:17px 20px;gap:12px}.brand{display:flex;al
 .shopping-day input,.shopping-line input{width:20px;height:20px;flex:none;accent-color:#304d3b}
 .shopping-selection{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}.shopping-selection .btn{font-size:13px}
 .shopping-checklist{display:grid;gap:7px}.shopping-line{background:white;overflow-wrap:anywhere}.shopping-line:has(input:checked) span{text-decoration:line-through;color:#798178}
-.shopping-universe{display:grid;gap:7px;margin:8px 0 16px}.shopping-universe h3{margin:9px 0 4px;font-size:17px;color:#304d3b;border-bottom:1px solid #d6e2d0;padding-bottom:8px}
+.shopping-line .shopping-description{display:flex;flex-direction:column;gap:3px;min-width:0}.shopping-line .shopping-dishes{font-size:12px;color:#657467;line-height:1.35;text-decoration:none!important}.shopping-universe{display:grid;gap:7px;margin:8px 0 16px}.shopping-universe h3{margin:9px 0 4px;font-size:17px;color:#304d3b;border-bottom:1px solid #d6e2d0;padding-bottom:8px}
 /* Menus : quantités par personne et suggestions d’accompagnement */
 .menu-balance{margin:10px 0;padding:12px;background:#f0f4ec;border:1px solid #d6e2d0;border-radius:12px;font-size:13px;line-height:1.5}.menu-balance ul{margin:6px 0 10px;padding-left:20px}.menu-balance li{padding:2px 0}
 </style><style>/* Choix explicite d’une recette lors du remplacement d’un repas */
@@ -353,7 +353,7 @@ function shopUniverse(name){
 }
 function shoppingLines(){
  const grouped=new Map();
- function add(raw){
+ function add(raw, dish){
   const line=String(raw||'').trim();if(!line)return;
   const m=line.match(/^(\d+(?:[.,]\d+)?)\s*(kg|g|ml|cl|l|cs|cc|c\.?\s*à\s*s\.?|c\.?\s*à\s*c\.?|cuillères? à soupe|cuillères? à café|unités?|pièces?|pincées?|morceaux?)?\s*(.*)$/i);
   let qty=null,unit='',name=line;
@@ -366,10 +366,11 @@ function shoppingLines(){
    else if(/^unite/.test(unit))unit='unité';else if(/^piece/.test(unit))unit='pièce';
   }
   const key=norm(name).replace(/\s+/g,' ').trim()+'|'+(qty===null?'texte':unit);
-  if(!grouped.has(key))grouped.set(key,{name,qty:qty===null?null:0,unit});
+  if(!grouped.has(key))grouped.set(key,{name,qty:qty===null?null:0,unit,dishes:new Set()});
   if(qty!==null)grouped.get(key).qty+=qty;
+  if(dish)grouped.get(key).dishes.add(dish);
  }
- plan.forEach((day,di)=>{if(!selectedDays[di])return;day.forEach((m,slot)=>{if(!m)return;const balance=mealBalance(m,slot);if(balance){balance.ingredients.forEach(add);balance.additions.forEach(add)}else (m.ingredients||[]).forEach(add)})});
+ plan.forEach((day,di)=>{if(!selectedDays[di])return;day.forEach((m,slot)=>{if(!m)return;const balance=mealBalance(m,slot);if(balance){balance.ingredients.forEach(line=>add(line,m.name));balance.additions.forEach(line=>add(line,m.name))}else (m.ingredients||[]).forEach(line=>add(line,m.name))})});
  function displayQty(qty,unit){
   let n=qty;
   if(unit==='cs'||unit==='cc')n=Math.round((n+Number.EPSILON)*2)/2;
@@ -377,7 +378,7 @@ function shoppingLines(){
   else n=Math.round(n*100)/100;
   return String(n).replace('.',',');
  }
- return [...grouped.entries()].map(([key,item])=>({key,universe:shopUniverse(item.name),label:item.qty===null?item.name:(displayQty(item.qty,item.unit)+' '+(item.unit?item.unit+' ':'')+item.name)})).sort((a,b)=>SHOP_UNIVERSES.indexOf(a.universe)-SHOP_UNIVERSES.indexOf(b.universe)||a.label.localeCompare(b.label,'fr',{sensitivity:'base'}));
+ return [...grouped.entries()].map(([key,item])=>({key,universe:shopUniverse(item.name),dishes:[...item.dishes],label:item.qty===null?item.name:(displayQty(item.qty,item.unit)+' '+(item.unit?item.unit+' ':'')+item.name)})).sort((a,b)=>SHOP_UNIVERSES.indexOf(a.universe)-SHOP_UNIVERSES.indexOf(b.universe)||a.label.localeCompare(b.label,'fr',{sensitivity:'base'}));
 }
 function render(){if(!plan)return;const content=$('menusContent');if(shopping){
  const items=shoppingLines(),count=selectedDays.filter(Boolean).length;
