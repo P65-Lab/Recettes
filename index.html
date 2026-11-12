@@ -83,6 +83,7 @@ header{background:#fffdf8}.bar{padding:17px 20px;gap:12px}.brand{display:flex;al
 .shopping-day input,.shopping-line input{width:20px;height:20px;flex:none;accent-color:#304d3b}
 .shopping-selection{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}.shopping-selection .btn{font-size:13px}
 .shopping-checklist{display:grid;gap:7px}.shopping-line{background:white;overflow-wrap:anywhere}.shopping-line:has(input:checked) span{text-decoration:line-through;color:#798178}
+.shopping-universe{display:grid;gap:7px;margin:8px 0 16px}.shopping-universe h3{margin:9px 0 4px;font-size:17px;color:#304d3b;border-bottom:1px solid #d6e2d0;padding-bottom:8px}
 /* Menus : quantités par personne et suggestions d’accompagnement */
 .menu-balance{margin:10px 0;padding:12px;background:#f0f4ec;border:1px solid #d6e2d0;border-radius:12px;font-size:13px;line-height:1.5}.menu-balance ul{margin:6px 0 10px;padding-left:20px}.menu-balance li{padding:2px 0}
 </style><style>/* Choix explicite d’une recette lors du remplacement d’un repas */
@@ -338,26 +339,49 @@ function change(day,slot){
 function balanceHtml(m,slot){const info=mealBalance(m,slot);if(!info)return '';
  return '<div class="menu-balance"><div><strong>Quantités pour 1 personne (indicatives)</strong></div><ul>'+info.ingredients.map(x=>'<li>'+safe(x)+'</li>').join('')+'</ul><div><strong>Pour compléter ce repas :</strong> '+(info.additions.length?info.additions.map(safe).join(' · '):'Aucun accompagnement supplémentaire identifié')+'</div></div>';
 }
+/* Courses : regroupement, arrondis pratiques et classement par univers. */
+const SHOP_UNIVERSES=['🥕 Fruits et légumes','🥩 Boucherie et poissonnerie','🥛 Produits frais','🥖 Boulangerie','🍚 Épicerie','🧂 Épices et condiments','🛒 Autres produits'];
+function shopUniverse(name){
+ const n=norm(name);
+ if(/poivron|oignon|tomate|courgette|carotte|brocoli|salade|concombre|aubergine|poireau|champignon|pomme|poire|banane|fraise|citron|orange|ail|legume|fruit|piment frais|herbe fraiche/.test(n))return SHOP_UNIVERSES[0];
+ if(/poulet|escalope|filet|boeuf|porc|dinde|viande|steak|jambon|poisson|saumon|cabillaud|thon frais|crevette/.test(n))return SHOP_UNIVERSES[1];
+ if(/oeuf|lait|yaourt|fromage|beurre|creme|skyr|faisselle/.test(n))return SHOP_UNIVERSES[2];
+ if(/pain|baguette|brioche|biscotte|croissant/.test(n))return SHOP_UNIVERSES[3];
+ if(/sel|poivre|curry|cumin|paprika|epice|huile|vinaigre|moutarde|piment|coriandre|persil|basilic|thym|romarin|bouillon|sauce/.test(n))return SHOP_UNIVERSES[5];
+ if(/riz|pate|semoule|quinoa|farine|sucre|avoine|lentille|pois chiche|haricot|conserve|tomates pelees|vin|feculent|cereale/.test(n))return SHOP_UNIVERSES[4];
+ return SHOP_UNIVERSES[6];
+}
 function shoppingLines(){
  const grouped=new Map();
  function add(raw){
   const line=String(raw||'').trim();if(!line)return;
-  // Additionner uniquement les quantités numériques de même unité et de même ingrédient.
-  const m=line.match(/^(\d+(?:[.,]\d+)?)\s*(kg|g|ml|cl|l|cs|c\.?\s*à\s*s\.?|cuillères? à soupe|cuillères? à café|unités?|pièces?)?\s+(.+)$/i);
+  const m=line.match(/^(\d+(?:[.,]\d+)?)\s*(kg|g|ml|cl|l|cs|cc|c\.?\s*à\s*s\.?|c\.?\s*à\s*c\.?|cuillères? à soupe|cuillères? à café|unités?|pièces?|pincées?|morceaux?)?\s*(.*)$/i);
   let qty=null,unit='',name=line;
-  if(m){qty=Number(m[1].replace(',','.'));unit=norm(m[2]||'').replace(/\s+/g,' ').trim();name=m[3].trim();}
-  // Convertir les unités compatibles pour pouvoir additionner, sans deviner les autres.
-  if(qty!==null){if(unit==='kg'){qty*=1000;unit='g'}else if(unit==='l'){qty*=1000;unit='ml'}else if(unit==='cl'){qty*=10;unit='ml'}else if(unit==='c a s'||unit==='c. a s.'||unit==='cuillere a soupe'||unit==='cuilleres a soupe'){unit='cs'}}
+  if(m&&m[3].trim()){qty=Number(m[1].replace(',','.'));unit=norm(m[2]||'').replace(/\s+/g,' ').trim();name=m[3].trim();}
+  if(qty!==null){
+   if(unit==='kg'){qty*=1000;unit='g'}else if(unit==='l'){qty*=1000;unit='ml'}else if(unit==='cl'){qty*=10;unit='ml'}
+   else if(/^(cs|c\.? a s\.?|cuilleres? a soupe)$/.test(unit))unit='cs';
+   else if(/^(cc|c\.? a c\.?|cuilleres? a cafe)$/.test(unit))unit='cc';
+   else if(/^pincee/.test(unit))unit='pincée';else if(/^morceau/.test(unit))unit='morceau';
+   else if(/^unite/.test(unit))unit='unité';else if(/^piece/.test(unit))unit='pièce';
+  }
   const key=norm(name).replace(/\s+/g,' ').trim()+'|'+(qty===null?'texte':unit);
   if(!grouped.has(key))grouped.set(key,{name,qty:qty===null?null:0,unit});
-  const item=grouped.get(key);if(qty!==null)item.qty+=qty;
+  if(qty!==null)grouped.get(key).qty+=qty;
  }
  plan.forEach((day,di)=>{if(!selectedDays[di])return;day.forEach((m,slot)=>{if(!m)return;const balance=mealBalance(m,slot);if(balance){balance.ingredients.forEach(add);balance.additions.forEach(add)}else (m.ingredients||[]).forEach(add)})});
- return [...grouped.entries()].map(([key,item])=>({key,label:item.qty===null?item.name:(String(Math.round(item.qty*100)/100).replace('.',',')+' '+(item.unit?item.unit+' ':'')+item.name)})).sort((a,b)=>a.label.localeCompare(b.label,'fr',{sensitivity:'base'}));
+ function displayQty(qty,unit){
+  let n=qty;
+  if(unit==='cs'||unit==='cc')n=Math.round((n+Number.EPSILON)*2)/2;
+  else if(!['g','ml','kg','cl','l'].includes(unit))n=Math.ceil(n-0.5-1e-9); // 4,5 reste 4 ; 4,6 devient 5
+  else n=Math.round(n*100)/100;
+  return String(n).replace('.',',');
+ }
+ return [...grouped.entries()].map(([key,item])=>({key,universe:shopUniverse(item.name),label:item.qty===null?item.name:(displayQty(item.qty,item.unit)+' '+(item.unit?item.unit+' ':'')+item.name)})).sort((a,b)=>SHOP_UNIVERSES.indexOf(a.universe)-SHOP_UNIVERSES.indexOf(b.universe)||a.label.localeCompare(b.label,'fr',{sensitivity:'base'}));
 }
 function render(){if(!plan)return;const content=$('menusContent');if(shopping){
  const items=shoppingLines(),count=selectedDays.filter(Boolean).length;
- content.innerHTML='<div class="panel"><h2>🛒 Liste de courses</h2><p class="hint">Choisis les jours à préparer. Quantités indicatives pour 1 personne par repas, d’après tes recettes ; les accompagnements proposés sont inclus. Vérifie les unités et les quantités avant les achats.</p><div class="shopping-days">'+DAYS.map((day,i)=>'<label class="shopping-day"><input type="checkbox" data-shop-day="'+i+'" '+(selectedDays[i]?'checked':'')+'><span>'+day+'</span></label>').join('')+'</div><div class="shopping-selection"><button type="button" class="btn secondary" data-shop-all="1">Tous les jours</button><button type="button" class="btn secondary" data-shop-none="1">Aucun</button></div><p class="hint">'+count+' jour'+(count>1?'s':'')+' sélectionné'+(count>1?'s':'')+'</p><div class="shopping-checklist">'+(items.length?items.map(item=>'<label class="shopping-line"><input type="checkbox" data-shop-item="'+safe(item.key)+'" '+(checkedItems[item.key]?'checked':'')+'><span>'+safe(item.label)+'</span></label>').join(''):'<p class="hint">Sélectionne au moins un jour avec des recettes pour afficher les courses.</p>')+'</div></div>';return}
+ content.innerHTML='<div class="panel"><h2>🛒 Liste de courses</h2><p class="hint">Choisis les jours à préparer. Quantités indicatives pour 1 personne par repas, d’après tes recettes ; les accompagnements proposés sont inclus. Vérifie les unités et les quantités avant les achats.</p><div class="shopping-days">'+DAYS.map((day,i)=>'<label class="shopping-day"><input type="checkbox" data-shop-day="'+i+'" '+(selectedDays[i]?'checked':'')+'><span>'+day+'</span></label>').join('')+'</div><div class="shopping-selection"><button type="button" class="btn secondary" data-shop-all="1">Tous les jours</button><button type="button" class="btn secondary" data-shop-none="1">Aucun</button></div><p class="hint">'+count+' jour'+(count>1?'s':'')+' sélectionné'+(count>1?'s':'')+'</p><div class="shopping-checklist">'+(items.length?SHOP_UNIVERSES.map(universe=>{const group=items.filter(item=>item.universe===universe);return group.length?'<div class="shopping-universe"><h3>'+safe(universe)+'</h3>'+group.map(item=>'<label class="shopping-line"><input type="checkbox" data-shop-item="'+safe(item.key)+'" '+(checkedItems[item.key]?'checked':'')+'><span>'+safe(item.label)+'</span></label>').join('')+'</div>':''}).join(''):'<p class="hint">Sélectionne au moins un jour avec des recettes pour afficher les courses.</p>')+'</div></div>';return}
 content.innerHTML=plan.map((day,di)=>'<div class="menu-day"><h2>'+DAYS[di]+'</h2>'+day.map((m,mi)=>'<div class="menu-meal"><strong>'+MEALS[mi]+'</strong>'+(m?'<p>'+safe(m.name)+'</p><span class="muted">📖 Recette de mon livre</span>'+balanceHtml(m,mi)+'<div class="menu-meal-actions"><button class="btn secondary" type="button" data-menu-change="'+di+'-'+mi+'">↻ Changer ce repas</button><button class="btn secondary" type="button" data-menu-recipe="'+safe(m.id)+'">Voir la recette</button></div>':'<p class="muted">Aucune recette sélectionnée.</p><button class="btn secondary" type="button" data-menu-change="'+di+'-'+mi+'">＋ Choisir une recette</button>')+'</div>').join('')+'</div>').join('')}
 function open(){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='menus'));shopping=false;render();window.scrollTo(0,0)}
 $('menusMenu').addEventListener('click',()=>{const nav=$('menuPanel');nav.classList.remove('open');$('menuToggle').setAttribute('aria-expanded','false');open()});
