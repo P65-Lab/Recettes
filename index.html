@@ -77,6 +77,12 @@ header{background:#fffdf8}.bar{padding:17px 20px;gap:12px}.brand{display:flex;al
 #menusHomeButton{display:block;width:100%;min-height:53px;margin:0 0 20px;padding:13px 16px;border:1px solid #a7b99f;border-radius:14px;background:#e9eee2;color:#304d3b;font-weight:700;font-size:17px;text-align:center}
 #menusHomeButton:focus-visible{outline:3px solid #607a62;outline-offset:2px}
 
+/* Courses par jours sélectionnés : cases cochables sur iPhone et ordinateur. */
+.shopping-days{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px;margin:15px 0}
+.shopping-day,.shopping-line{display:flex;align-items:center;gap:11px;padding:11px 12px;border:1px solid #d6e2d0;border-radius:11px;background:#f7faf5;cursor:pointer}
+.shopping-day input,.shopping-line input{width:20px;height:20px;flex:none;accent-color:#304d3b}
+.shopping-selection{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}.shopping-selection .btn{font-size:13px}
+.shopping-checklist{display:grid;gap:7px}.shopping-line{background:white;overflow-wrap:anywhere}.shopping-line:has(input:checked) span{text-decoration:line-through;color:#798178}
 /* Menus : quantités par personne et suggestions d’accompagnement */
 .menu-balance{margin:10px 0;padding:12px;background:#f0f4ec;border:1px solid #d6e2d0;border-radius:12px;font-size:13px;line-height:1.5}.menu-balance ul{margin:6px 0 10px;padding-left:20px}.menu-balance li{padding:2px 0}
 </style><style>/* Choix explicite d’une recette lors du remplacement d’un repas */
@@ -298,6 +304,10 @@ function mealBalance(m,slot){
  return {parts,additions,ingredients:String(r.ingredients||'').split('\n').map(x=>x.trim()).filter(Boolean).map(x=>quantityPerPerson(x,parts))};
 }
 let plan=null,shopping=false;
+const SHOP_DAYS_KEY="livre-recettes-courses-jours-v1",SHOP_CHECK_KEY="livre-recettes-courses-cochees-v1";
+let selectedDays=(()=>{try{const v=JSON.parse(localStorage.getItem(SHOP_DAYS_KEY));return Array.isArray(v)?DAYS.map((_,i)=>v.includes(i)):DAYS.map(()=>true)}catch{return DAYS.map(()=>true)}})();
+let checkedItems=(()=>{try{return JSON.parse(localStorage.getItem(SHOP_CHECK_KEY))||{}}catch{return {}}})();
+const storeShopping=()=>{try{localStorage.setItem(SHOP_DAYS_KEY,JSON.stringify(selectedDays.map((v,i)=>v?i:-1).filter(i=>i>=0)));localStorage.setItem(SHOP_CHECK_KEY,JSON.stringify(checkedItems))}catch{}};
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(plan));return true}catch{alert('Impossible d’enregistrer les menus sur cet appareil.');return false}}
 function options(slot){return libraryCandidates(slot)}
 function pick(slot,used,offset=0){const pool=options(slot),available=pool.filter(x=>!used.has(x.name));const arr=available.length?available:pool;return arr.length?{...arr[(offset+Math.floor(Math.random()*arr.length))%arr.length]}:null}
@@ -328,14 +338,35 @@ function change(day,slot){
 function balanceHtml(m,slot){const info=mealBalance(m,slot);if(!info)return '';
  return '<div class="menu-balance"><div><strong>Quantités pour 1 personne (indicatives)</strong></div><ul>'+info.ingredients.map(x=>'<li>'+safe(x)+'</li>').join('')+'</ul><div><strong>Pour compléter ce repas :</strong> '+(info.additions.length?info.additions.map(safe).join(' · '):'Aucun accompagnement supplémentaire identifié')+'</div></div>';
 }
-function render(){if(!plan)return;const content=$('menusContent');if(shopping){const items=[...new Set(plan.flatMap(day=>day.flatMap((m,slot)=>m?[...(m.ingredients||[]),...(mealBalance(m,slot)?.additions||[])]:[])).map(x=>x.trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
-content.innerHTML='<div class="panel"><h2>🛒 Liste de courses</h2><p class="hint">Liste indicative pour la semaine : ingrédients des recettes et accompagnements suggérés. Les quantités de courses sont à adapter au nombre de personnes et aux repas répétés.</p><div class="menu-shopping">'+items.map(x=>'☐ '+safe(x)).join('<br>')+'</div></div>';return}
+function shoppingLines(){
+ const grouped=new Map();
+ function add(raw){
+  const line=String(raw||'').trim();if(!line)return;
+  // Additionner uniquement les quantités numériques de même unité et de même ingrédient.
+  const m=line.match(/^(\d+(?:[.,]\d+)?)\s*(kg|g|ml|cl|l|cs|c\.?\s*à\s*s\.?|cuillères? à soupe|cuillères? à café|unités?|pièces?)?\s+(.+)$/i);
+  let qty=null,unit='',name=line;
+  if(m){qty=Number(m[1].replace(',','.'));unit=norm(m[2]||'').replace(/\s+/g,' ').trim();name=m[3].trim();}
+  // Convertir les unités compatibles pour pouvoir additionner, sans deviner les autres.
+  if(qty!==null){if(unit==='kg'){qty*=1000;unit='g'}else if(unit==='l'){qty*=1000;unit='ml'}else if(unit==='cl'){qty*=10;unit='ml'}else if(unit==='c a s'||unit==='c. a s.'||unit==='cuillere a soupe'||unit==='cuilleres a soupe'){unit='cs'}}
+  const key=norm(name).replace(/\s+/g,' ').trim()+'|'+(qty===null?'texte':unit);
+  if(!grouped.has(key))grouped.set(key,{name,qty:qty===null?null:0,unit});
+  const item=grouped.get(key);if(qty!==null)item.qty+=qty;
+ }
+ plan.forEach((day,di)=>{if(!selectedDays[di])return;day.forEach((m,slot)=>{if(!m)return;const balance=mealBalance(m,slot);if(balance){balance.ingredients.forEach(add);balance.additions.forEach(add)}else (m.ingredients||[]).forEach(add)})});
+ return [...grouped.entries()].map(([key,item])=>({key,label:item.qty===null?item.name:(String(Math.round(item.qty*100)/100).replace('.',',')+' '+(item.unit?item.unit+' ':'')+item.name)})).sort((a,b)=>a.label.localeCompare(b.label,'fr',{sensitivity:'base'}));
+}
+function render(){if(!plan)return;const content=$('menusContent');if(shopping){
+ const items=shoppingLines(),count=selectedDays.filter(Boolean).length;
+ content.innerHTML='<div class="panel"><h2>🛒 Liste de courses</h2><p class="hint">Choisis les jours à préparer. Quantités indicatives pour 1 personne par repas, d’après tes recettes ; les accompagnements proposés sont inclus. Vérifie les unités et les quantités avant les achats.</p><div class="shopping-days">'+DAYS.map((day,i)=>'<label class="shopping-day"><input type="checkbox" data-shop-day="'+i+'" '+(selectedDays[i]?'checked':'')+'><span>'+day+'</span></label>').join('')+'</div><div class="shopping-selection"><button type="button" class="btn secondary" data-shop-all="1">Tous les jours</button><button type="button" class="btn secondary" data-shop-none="1">Aucun</button></div><p class="hint">'+count+' jour'+(count>1?'s':'')+' sélectionné'+(count>1?'s':'')+'</p><div class="shopping-checklist">'+(items.length?items.map(item=>'<label class="shopping-line"><input type="checkbox" data-shop-item="'+safe(item.key)+'" '+(checkedItems[item.key]?'checked':'')+'><span>'+safe(item.label)+'</span></label>').join(''):'<p class="hint">Sélectionne au moins un jour avec des recettes pour afficher les courses.</p>')+'</div></div>';return}
 content.innerHTML=plan.map((day,di)=>'<div class="menu-day"><h2>'+DAYS[di]+'</h2>'+day.map((m,mi)=>'<div class="menu-meal"><strong>'+MEALS[mi]+'</strong>'+(m?'<p>'+safe(m.name)+'</p><span class="muted">📖 Recette de mon livre</span>'+balanceHtml(m,mi)+'<div class="menu-meal-actions"><button class="btn secondary" type="button" data-menu-change="'+di+'-'+mi+'">↻ Changer ce repas</button><button class="btn secondary" type="button" data-menu-recipe="'+safe(m.id)+'">Voir la recette</button></div>':'<p class="muted">Aucune recette sélectionnée.</p><button class="btn secondary" type="button" data-menu-change="'+di+'-'+mi+'">＋ Choisir une recette</button>')+'</div>').join('')+'</div>').join('')}
 function open(){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='menus'));shopping=false;render();window.scrollTo(0,0)}
 $('menusMenu').addEventListener('click',()=>{const nav=$('menuPanel');nav.classList.remove('open');$('menuToggle').setAttribute('aria-expanded','false');open()});
 $('menusGenerate').addEventListener('click',()=>{if(plan&&!confirm('Créer une nouvelle semaine de menus ? Les menus actuels seront remplacés.'))return;generate()});
 $('menusShopping').addEventListener('click',()=>{shopping=!shopping;$('menusShopping').textContent=shopping?'← Voir les menus':'🛒 Liste de courses';render()});
+$('menusContent').addEventListener('change',e=>{const day=e.target.closest('input[data-shop-day]'),item=e.target.closest('input[data-shop-item]');if(day){selectedDays[Number(day.dataset.shopDay)]=day.checked;storeShopping();render()}else if(item){checkedItems[item.dataset.shopItem]=item.checked;storeShopping()}});
 $('menusContent').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+ if(b.dataset.shopAll){selectedDays=DAYS.map(()=>true);storeShopping();render();return}
+ if(b.dataset.shopNone){selectedDays=DAYS.map(()=>false);storeShopping();render();return}
  if(b.dataset.menuChange){const [d,m]=b.dataset.menuChange.split('-').map(Number);change(d,m)}
  if(b.dataset.menuRecipe){const r=readRecipes().find(x=>x.id===b.dataset.menuRecipe);if(!r)return;document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='home'));const cards=[...document.querySelectorAll('#cards .recipe[data-view]')];const card=cards.find(x=>x.dataset.view===r.id);if(card)card.click();else{const search=$('search');search.value=r.nom;search.dispatchEvent(new Event('input',{bubbles:true}));const found=document.querySelector('#cards .recipe[data-view]');if(found)found.click();} }
  if(b.dataset.menuAdd){const [d,m]=b.dataset.menuAdd.split('-').map(Number),item=plan[d]?.[m];if(!item||item.source!=='idea')return;const recipes=readRecipes();if(recipes.some(r=>norm(r.nom)===norm(item.name))){alert('Cette recette est déjà dans ton livre.');return}if(!confirm('Ajouter « '+item.name+' » à ton livre de recettes ?'))return;
