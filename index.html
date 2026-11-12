@@ -87,6 +87,12 @@ header{background:#fffdf8}.bar{padding:17px 20px;gap:12px}.brand{display:flex;al
 /* Menus : quantités par personne et suggestions d’accompagnement */
 .menu-balance{margin:10px 0;padding:12px;background:#f0f4ec;border:1px solid #d6e2d0;border-radius:12px;font-size:13px;line-height:1.5}.menu-balance ul{margin:6px 0 10px;padding-left:20px}.menu-balance li{padding:2px 0}
 .breakfast-choices{display:grid;gap:7px;margin:9px 0 12px}.breakfast-option{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:#f7faf5;border:1px solid #d6e2d0;border-radius:10px;cursor:pointer;font-size:14px}.breakfast-option input{width:19px;height:19px;flex:none;accent-color:#304d3b}.breakfast-option.selected{background:#e9f1e5;border-color:#8fad85}.breakfast-choices .hint{margin:0 0 4px}
+
+/* Sélecteurs de repas repliables, identiques pour les trois repas. */
+#menus .meal-select-toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:10px 2px;text-align:left;background:transparent;border:0;color:var(--deep);cursor:pointer;font-size:16px}
+#menus .meal-select-toggle strong{display:block;margin:0}
+#menus .meal-select-toggle span{font-size:22px}
+#menus .meal-select-toggle:focus-visible{outline:2px solid var(--sage);outline-offset:2px;border-radius:6px}
 </style><style>/* Choix explicite d’une recette lors du remplacement d’un repas */
 .menu-choice-overlay{position:fixed;inset:0;z-index:1005;background:#0009;display:flex;align-items:center;justify-content:center;padding:16px}
 .menu-choice-box{width:min(520px,100%);max-height:85dvh;overflow:auto;background:#fffdf8;border-radius:18px;padding:20px;box-shadow:0 12px 35px #0004}
@@ -381,35 +387,38 @@ function shoppingLines(){
  }
  return [...grouped.entries()].map(([key,item])=>({key,universe:shopUniverse(item.name),dishes:[...item.dishes],label:item.qty===null?item.name:(displayQty(item.qty,item.unit)+' '+(item.unit?item.unit+' ':'')+item.name)})).sort((a,b)=>SHOP_UNIVERSES.indexOf(a.universe)-SHOP_UNIVERSES.indexOf(b.universe)||a.label.localeCompare(b.label,'fr',{sensitivity:'base'}));
 }
-function breakfastChoices(dayIndex){
- const current=plan[dayIndex][0];
- const choices=libraryCandidates(0);
- // Une recette déjà choisie reste proposée, même si son nom ne contient pas un mot-clé de petit-déjeuner.
- if(current?.id&&!choices.some(r=>r.id===current.id)){
-  const r=readRecipes().find(x=>x.id===current.id);
-  if(r)choices.unshift({name:r.nom,source:'library',id:r.id,ingredients:String(r.ingredients||'').split('\n').map(x=>x.trim()).filter(Boolean)});
- }
- if(!choices.length)return '<p class="hint">Ajoute une recette de petit-déjeuner dans ton livre pour pouvoir la sélectionner.</p>';
- return '<div class="breakfast-choices"><p class="hint">Choisir le petit-déjeuner de ce jour (une seule case) :</p>'+choices.map(r=>'<label class="breakfast-option '+(current?.id===r.id?'selected':'')+'"><input type="checkbox" data-breakfast-day="'+dayIndex+'" data-breakfast-id="'+safe(r.id)+'" '+(current?.id===r.id?'checked':'')+'><span>'+safe(r.name)+'</span></label>').join('')+'</div>';
+/* Sélection repliable d'une recette pour chaque repas de chaque journée. */
+let expandedMeal=null;
+function mealChoices(dayIndex,slot){
+ const current=plan[dayIndex][slot];
+ const choices=readRecipes().filter(r=>r&&r.id&&r.nom).sort((a,b)=>rName(a).localeCompare(rName(b),'fr'));
+ if(!choices.length)return '<p class="hint">Ajoute des recettes dans ton livre pour pouvoir choisir ce repas.</p>';
+ return '<div class="breakfast-choices" role="group" aria-label="Choisir '+safe(MEALS[slot])+' du '+safe(DAYS[dayIndex])+'">'+choices.map(r=>'<label class="breakfast-option '+(current?.id===r.id?'selected':'')+'"><input type="checkbox" data-meal-day="'+dayIndex+'" data-meal-slot="'+slot+'" data-meal-id="'+safe(r.id)+'" '+(current?.id===r.id?'checked':'')+'><span>'+safe(r.nom)+'</span></label>').join('')+'</div>';
 }
+function rName(r){return String(r.nom||'')}
 function render(){if(!plan)return;const content=$('menusContent');if(shopping){
  const items=shoppingLines(),count=selectedDays.filter(Boolean).length;
  content.innerHTML='<div class="panel"><h2>🛒 Liste de courses</h2><p class="hint">Choisis les jours à préparer. Quantités indicatives pour 1 personne par repas, d’après tes recettes ; les accompagnements proposés sont inclus. Vérifie les unités et les quantités avant les achats.</p><div class="shopping-days">'+DAYS.map((day,i)=>'<label class="shopping-day"><input type="checkbox" data-shop-day="'+i+'" '+(selectedDays[i]?'checked':'')+'><span>'+day+'</span></label>').join('')+'</div><div class="shopping-selection"><button type="button" class="btn secondary" data-shop-all="1">Tous les jours</button><button type="button" class="btn secondary" data-shop-none="1">Aucun</button></div><p class="hint">'+count+' jour'+(count>1?'s':'')+' sélectionné'+(count>1?'s':'')+'</p><div class="shopping-checklist">'+(items.length?SHOP_UNIVERSES.map(universe=>{const group=items.filter(item=>item.universe===universe);return group.length?'<div class="shopping-universe"><h3>'+safe(universe)+'</h3>'+group.map(item=>'<label class="shopping-line"><input type="checkbox" data-shop-item="'+safe(item.key)+'" '+(checkedItems[item.key]?'checked':'')+'><span class="shopping-description"><span>'+safe(item.label)+'</span>'+(item.dishes.length?'<small class="shopping-dishes">'+safe(item.dishes.join(' · '))+'</small>':'')+'</span></label>').join('')+'</div>':''}).join(''):'<p class="hint">Sélectionne au moins un jour avec des recettes pour afficher les courses.</p>')+'</div></div>';return}
-content.innerHTML=plan.map((day,di)=>'<div class="menu-day"><h2>'+DAYS[di]+'</h2>'+day.map((m,mi)=>'<div class="menu-meal"><strong>'+MEALS[mi]+'</strong>'+(m?'<p>'+safe(m.name)+'</p><span class="muted">📖 Recette de mon livre</span>'+(mi===0?breakfastChoices(di):'')+'<div class="menu-meal-actions"><button class="btn secondary" type="button" data-menu-change="'+di+'-'+mi+'">↻ Changer ce repas</button><button class="btn secondary" type="button" data-menu-recipe="'+safe(m.id)+'">Voir la recette</button></div>':'<p class="muted">Aucune recette sélectionnée.</p>'+(mi===0?breakfastChoices(di):'')+'<button class="btn secondary" type="button" data-menu-change="'+di+'-'+mi+'">＋ Choisir une recette</button>')+'</div>').join('')+'</div>').join('')}
+content.innerHTML=plan.map((day,di)=>'<div class="menu-day"><h2>'+DAYS[di]+'</h2>'+day.map((m,mi)=>{
+ const key=di+'-'+mi,expanded=expandedMeal===key;
+ return '<div class="menu-meal"><button type="button" class="meal-select-toggle" data-meal-toggle="'+key+'" aria-expanded="'+expanded+'"><strong>'+MEALS[mi]+'</strong><span aria-hidden="true">'+(expanded?'⌃':'⌄')+'</span></button>'+(expanded?mealChoices(di,mi):'')+'<div class="menu-meal-actions"><button class="btn secondary" type="button" data-menu-change="'+key+'">↻ Changer ce repas</button>'+(m?'<button class="btn secondary" type="button" data-menu-recipe="'+safe(m.id)+'">Voir la recette</button>':'')+'</div></div>';
+ }).join('')+'</div>').join('')}
+
 function open(){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='menus'));shopping=false;render();window.scrollTo(0,0)}
 $('menusMenu').addEventListener('click',()=>{const nav=$('menuPanel');nav.classList.remove('open');$('menuToggle').setAttribute('aria-expanded','false');open()});
 $('menusGenerate').addEventListener('click',()=>{if(plan&&!confirm('Créer une nouvelle semaine de menus ? Les menus actuels seront remplacés.'))return;generate()});
 $('menusShopping').addEventListener('click',()=>{shopping=!shopping;$('menusShopping').textContent=shopping?'← Voir les menus':'🛒 Liste de courses';render()});
-$('menusContent').addEventListener('change',e=>{const breakfast=e.target.closest('input[data-breakfast-day]');if(breakfast){
- const di=Number(breakfast.dataset.breakfastDay),id=breakfast.dataset.breakfastId;
+$('menusContent').addEventListener('change',e=>{const choice=e.target.closest('input[data-meal-day]');if(choice){
+ const di=Number(choice.dataset.mealDay),slot=Number(choice.dataset.mealSlot),id=choice.dataset.mealId;
  const r=readRecipes().find(x=>x.id===id);
  if(!r)return;
- // Cliquer sur la case déjà sélectionnée ne supprime pas le repas : une seule recette par jour.
- plan[di][0]={name:r.nom,source:'library',id:r.id,ingredients:String(r.ingredients||'').split('\n').map(x=>x.trim()).filter(Boolean)};
+ // Une seule recette cochée par repas ; la case active reste sélectionnée.
+ plan[di][slot]={name:r.nom,source:'library',id:r.id,ingredients:String(r.ingredients||'').split('\n').map(x=>x.trim()).filter(Boolean)};
  persist();render();return;
  }
  const day=e.target.closest('input[data-shop-day]'),item=e.target.closest('input[data-shop-item]');if(day){selectedDays[Number(day.dataset.shopDay)]=day.checked;storeShopping();render()}else if(item){checkedItems[item.dataset.shopItem]=item.checked;storeShopping()}});
 $('menusContent').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+ if(b.dataset.mealToggle!==undefined){expandedMeal=expandedMeal===b.dataset.mealToggle?null:b.dataset.mealToggle;render();return}
  if(b.dataset.shopAll){selectedDays=DAYS.map(()=>true);storeShopping();render();return}
  if(b.dataset.shopNone){selectedDays=DAYS.map(()=>false);storeShopping();render();return}
  if(b.dataset.menuChange){const [d,m]=b.dataset.menuChange.split('-').map(Number);change(d,m)}
