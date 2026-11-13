@@ -307,7 +307,7 @@ function libraryCandidates(slot){return readRecipes().filter(r=>{
 /* Estimations indicatives : les quantités des recettes sont divisées par le nombre de parts déclaré. */
 function recipeFor(m){return readRecipes().find(r=>r.id===m?.id)}
 function quantityPerPerson(line,parts){
- const match=String(line).trim().match(/^(\d+(?:[.,]\d+)?)\s*(kg|g|ml|cl|l|cs|c\.?\s*à\s*s\.?|cuillères? à soupe|cuillères? à café|unités?|pièces?)?\b\s*(.*)$/i);
+ const match=String(line).trim().match(/^(\d+(?:[.,]\d+)?)\s*(?:(kg|g|ml|cl|l|cs|c\.?\s*à\s*s\.?|cuillères? à soupe|cuillères? à café|unités?|pièces?)(?=\s|$))?\s*(.*)$/i);
  if(!match)return String(line);
  const amount=Number(match[1].replace(',','.'))/parts;
  const rounded=Math.round(amount*10)/10;
