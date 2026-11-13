@@ -377,7 +377,7 @@ function shoppingLines(){
  const grouped=new Map();
  function add(raw, dish){
   const line=String(raw||'').trim();if(!line)return;
-  const m=line.match(/^(\d+(?:[.,]\d+)?)\s*(kg|g|ml|cl|l|cs|cc|c\.?\s*à\s*s\.?|c\.?\s*à\s*c\.?|cuillères? à soupe|cuillères? à café|unités?|pièces?|pincées?|morceaux?)?\s*(.*)$/i);
+  const m=line.match(/^(\d+(?:[.,]\d+)?)\s*(kg|g|ml|cl|l|cs|cc|c\.?\s*à\s*s\.?|c\.?\s*à\s*c\.?|cuillères? à soupe|cuillères? à café|unités?|pièces?|pincées?|morceaux?)(?=\s|$))?\s*(.*)$/i);
   let qty=null,unit='',name=line;
   if(m&&m[3].trim()){qty=Number(m[1].replace(',','.'));unit=norm(m[2]||'').replace(/\s+/g,' ').trim();name=m[3].trim();}
   if(qty!==null){
