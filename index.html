@@ -307,6 +307,7 @@ function libraryCandidates(slot){return readRecipes().filter(r=>{
 /* Estimations indicatives : les quantités des recettes sont divisées par le nombre de parts déclaré. */
 function recipeFor(m){return readRecipes().find(r=>r.id===m?.id)}
 function quantityPerPerson(line,parts){
+ line=String(line).replace(/\bg\s+ousses?\b/gi, m=>m.replace(/\s+/g,''));
  const match=String(line).trim().match(/^(\d+(?:[.,]\d+)?)\s*(?:(kg|g|ml|cl|l|cs|c\.?\s*à\s*s\.?|cuillères? à soupe|cuillères? à café|unités?|pièces?)(?=\s|$))?\s*(.*)$/i);
  if(!match)return String(line);
  const amount=Number(match[1].replace(',','.'))/parts;
@@ -376,10 +377,12 @@ function shopUniverse(name){
 function shoppingLines(){
  const grouped=new Map();
  function add(raw, dish){
-  const line=String(raw||'').trim();if(!line)return;
-  const m=line.match(/^(\d+(?:[.,]\d+)?)\s*(kg|g|ml|cl|l|cs|cc|c\.?\s*à\s*s\.?|c\.?\s*à\s*c\.?|cuillères? à soupe|cuillères? à café|unités?|pièces?|pincées?|morceaux?)(?=\s|$))?\s*(.*)$/i);
+  const line=String(raw||'').trim().replace(/\bg\s+ousses?\b/gi,m=>m.replace(/\s+/g,''));if(!line)return;
+  const m=line.match(/^(\d+(?:[.,]\d+)?)\s*(?:(kg|g|ml|cl|l|cs|cc|c\.?\s*à\s*s\.?|c\.?\s*à\s*c\.?|cuillères? à soupe|cuillères? à café|unités?|pièces?|pincées?|morceaux?)(?=\s|$))?\s*(.*)$/i);
   let qty=null,unit='',name=line;
   if(m&&m[3].trim()){qty=Number(m[1].replace(',','.'));unit=norm(m[2]||'').replace(/\s+/g,' ').trim();name=m[3].trim();}
+  // Une gousse n'est jamais une quantité en grammes.
+  if(unit==='g' && /^ousses?\b/i.test(name)){unit='';name='g'+name;}
   if(qty!==null){
    if(unit==='kg'){qty*=1000;unit='g'}else if(unit==='l'){qty*=1000;unit='ml'}else if(unit==='cl'){qty*=10;unit='ml'}
    else if(/^(cs|c\.? a s\.?|cuilleres? a soupe)$/.test(unit))unit='cs';
