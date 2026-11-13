@@ -394,14 +394,22 @@ function shoppingLines(){
  }
  plan.forEach((day,di)=>{if(!selectedDays[di])return;day.forEach((m,slot)=>{if(!m)return;const balance=mealBalance(m,slot);if(balance){balance.ingredients.forEach(line=>add(line,m.name));balance.additions.forEach(line=>add(line,m.name))}else (m.ingredients||[]).forEach(line=>add(line,m.name))})});
  function displayQty(qty,unit){
-  let n=qty;
-  if(unit==='cs'||unit==='cc')n=Math.round((n+Number.EPSILON)*2)/2;
-  else if(!['g','ml','kg','cl','l'].includes(unit))n=Math.ceil(n-0.5-1e-9); // 4,5 reste 4 ; 4,6 devient 5
-  else n=Math.round(n*100)/100;
-  if(qty>0&&n===0)n=unit==='g'||unit==='ml'?Math.round(qty*100)/100:1;
+  let n;
+  if(unit==='cs'||unit==='cc')n=Math.ceil(qty*2-1e-9)/2;
+  else if(unit==='g'||unit==='ml')n=Math.max(1,Math.ceil(qty-1e-9));
+  else if(unit)n=Math.ceil(qty-1e-9);
+  else n=Math.ceil(qty-1e-9); // Gousses, fruits, oignons : unités entières pour les achats.
   return String(n).replace('.',',');
  }
- return [...grouped.entries()].filter(([,item])=>item.qty===null||item.qty>0).map(([key,item])=>({key,universe:shopUniverse(item.name),dishes:[...item.dishes],label:item.qty===null?item.name:(displayQty(item.qty,item.unit)+' '+(item.unit?item.unit+' ':'')+item.name)})).sort((a,b)=>SHOP_UNIVERSES.indexOf(a.universe)-SHOP_UNIVERSES.indexOf(b.universe)||a.label.localeCompare(b.label,'fr',{sensitivity:'base'}));
+ function shoppingLabel(item){
+  if(item.qty===null)return item.name;
+  const n=Number(displayQty(item.qty,item.unit).replace(',','.'));
+  let name=item.name;
+  // Accords simples pour les ingrédients comptés à l'unité.
+  if(n===1)name=name.replace(/^gousses\b/i,'gousse').replace(/^oignons\b/i,'oignon').replace(/^courgettes\b/i,'courgette');
+  return displayQty(item.qty,item.unit)+' '+(item.unit?item.unit+' ':'')+name;
+ }
+ return [...grouped.entries()].filter(([,item])=>item.qty===null||item.qty>0).map(([key,item])=>({key,universe:shopUniverse(item.name),dishes:[...item.dishes],label:shoppingLabel(item)})).sort((a,b)=>SHOP_UNIVERSES.indexOf(a.universe)-SHOP_UNIVERSES.indexOf(b.universe)||a.label.localeCompare(b.label,'fr',{sensitivity:'base'}));
 }
 /* Sélection repliable d'une recette pour chaque repas de chaque journée. */
 let expandedMeal=null;
